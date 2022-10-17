@@ -167,7 +167,7 @@ def create_personal_data_processors(neo, wiki):
         trans = f"CREATE (s:Behandling {{name:'{processor_name}', wiki_id:{processor_id}, Ändamål:'{purpose}', Känsliga_personuppgifter:'{sensitive_data}'}})"
         trans_list.append(trans)
         trans = f"MATCH (b:Behandling), (s:System) WHERE b.wiki_id={processor_id} and s.wiki_id IN [{system_id}] \
-                  CREATE(m)-[r:Tillhör]->(s)"
+                  CREATE(b)-[r:Tillhör]->(s)"
         trans_list.append(trans)
         if sensitive_data == "Ja":
             trans = f"MATCH (b:Behandling), (k:`Känsliga personuppgifter`) WHERE b.wiki_id={processor_id} \
