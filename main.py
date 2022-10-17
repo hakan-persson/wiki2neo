@@ -42,10 +42,10 @@ def create_static_stuff(neo):
 """ 
 Create all Wiki objects
 """
-def create_object(neo, wiki):
+def create_fo_object(neo, wiki):
     query = "[[Category:Aktiva_objekt]]|?Objekt|?Status"
     answers = wiki.ask(query)
-    trans_list = [f"CREATE (s:Objekt {{name:{answer['displaytitle']}, wiki_id:{answer['fulltext'].split(':', 1)[1]}, function:'Undefined'}})" for answer in answers]
+    trans_list = [f"CREATE (s:Objekt {{name:'{answer['displaytitle']}', wiki_id:'{answer['fulltext'].split(':', 1)[1]}', function:'Undefined'}})" for answer in answers]
     neo.execute_write(_do_transact, trans_list)
 
 
@@ -62,7 +62,7 @@ def create_systems(neo, wiki):
         fo_id = answer["printouts"]["Tillhörande objekt"][0]["fulltext"].split(":", 1)[1]
         system_function = answer["printouts"]["Funktion"][0] if "Funktion" in answer["printouts"]["Funktion"] else "Undefined"
         
-        trans = f"CREATE (s:System {{name:{system_name}, wiki_id:{system_id}, function:{system_function}}}"
+        trans = f"CREATE (s:System {{name:'{system_name}', wiki_id:'{system_id}', function:'{system_function}'}})"
         trans_list.append(trans)
         trans = f"MATCH (s:System), (f:Objekt) WHERE s.wiki_id='{system_id}' and f.wiki_id='{fo_id}'\n CREATE(s)-[r:ingår_i]->(f)"
         trans_list.append(trans)
@@ -78,7 +78,7 @@ def main():
     with neo_driver.session() as neo_session:
         empty_db(neo_session)           # Start by emptying database
         create_static_stuff(neo_session)
-        create_object(neo_session, wiki_session)
+        create_fo_object(neo_session, wiki_session)
         create_systems(neo_session, wiki_session)
 
 
