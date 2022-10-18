@@ -54,7 +54,7 @@ def create_fo_object(neo, wiki):
     logging.info("Create all Wiki objects")
     query = "[[Category:Aktiva_objekt]]|?Objekt|?Status"
     answer = wiki.ask(query)
-    trans_list = [f"CREATE (s:Objekt {{name:'{object['displaytitle']}', wiki_id:{object['fulltext'].split(':', 1)[1]}, function:'Undefined'}})" for object in answer]
+    trans_list = [f"CREATE (:Objekt {{name:'{object['displaytitle']}', wiki_id:{object['fulltext'].split(':', 1)[1]}, function:'Undefined'}})" for object in answer]
     neo.execute_write(_do_transact, trans_list)
 
 
@@ -70,14 +70,15 @@ def create_systems(neo, wiki):
     for system in answer:
         system_name = system["displaytitle"]
         system_id = system["fulltext"].split(":", 1)[1]
-        fo_id = system["printouts"]["Tillhörande objekt"][0]["fulltext"].split(":", 1)[1]
-        system_function = system["printouts"]["Funktion"][0] if "Funktion" in system["printouts"] else "Undefined"
+        fo_id = system["printouts"]["Tillhörande objekt"][0]["fulltext"].split(":", 1)[1] if system["printouts"]["Tillhörande objekt"] else None
+        system_function = system["printouts"]["Funktion"][0] if system["printouts"]["Funktion"] else "Undefined"
         
         trans = f"CREATE (s:System {{name:'{system_name}', wiki_id:{system_id}, function:'{system_function}'}})"
         trans_list.append(trans)
-        trans = f"MATCH (s:System), (f:Objekt) WHERE s.wiki_id={system_id} and f.wiki_id={fo_id} \
-                  CREATE(s)-[r:ingår_i]->(f)"
-        trans_list.append(trans)
+        if fo_id:
+            trans = f"MATCH (s:System), (f:Objekt) WHERE s.wiki_id={system_id} and f.wiki_id={fo_id} \
+                    CREATE (s)-[r:ingår_i]->(f)"
+            trans_list.append(trans)
 
     neo.execute_write(_do_transact, trans_list)
 
@@ -95,7 +96,7 @@ def create_servers(neo, wiki):
         module_name = server["displaytitle"]
         module_url = server["fullurl"]
         module_id = server["fulltext"].split(":", 1)[1]
-        if "Tillhörande system" in server["printouts"]:
+        if server["printouts"]["Tillhörande system"]:
             temp_id = [system["fulltext"].split(":", 1)[1] for system in server["printouts"]["Tillhörande system"]]
             system_id = ",".join(temp_id)
         else:
@@ -104,7 +105,7 @@ def create_servers(neo, wiki):
         trans = f"CREATE (:Modul {{name:'{module_name}', wiki_id:{module_id}, url:'{module_url}'}})"
         trans_list.append(trans)
         trans = f"MATCH (m:Modul), (s:System) WHERE m.wiki_id={module_id} and s.wiki_id IN [{system_id}] \
-                  CREATE(m)-[r:Tillhör]->(s)"
+                  CREATE (m)-[r:Tillhör]->(s)"
         trans_list.append(trans)
 
     neo.execute_write(_do_transact, trans_list)
@@ -133,11 +134,11 @@ def create_dependencies(neo, wiki):
     for dependency in answer:
         from_obj = dependency["printouts"]["Från"][0]["fulltext"].split(":", 1)
         to_obj = dependency["printouts"]["Till"][0]["fulltext"].split(":", 1)
-        dep_type = dependency["printouts"]["Typ av beroende"][0] if "Typ av beroende" in dependency["printouts"] else "Undefined"
+        dep_type = dependency["printouts"]["Typ av beroende"][0] if dependency["printouts"]["Typ av beroende"] else "Undefined"
         dep_id = dependency["fulltext"].split(":", 1)[1]
 
         trans = f"MATCH (s1:{from_obj[0]}), (s2:{to_obj[0]}) WHERE s1.wiki_id={from_obj[1]} and s2.wiki_id={to_obj[1]} \
-                  CREATE(s1)-[Beroende:`{dep_type}` {{BeroendeUrl: 'https://ufm.strangnas.se/wiki/Beroende: {dep_id}', typ:'Systemberoende'}}]->(s2)"
+                  CREATE (s1)-[Beroende:`{dep_type}` {{BeroendeUrl: 'https://{ITWIKI_DOMAIN}/wiki/Beroende: {dep_id}', typ:'Systemberoende'}}]->(s2)"
         trans_list.append(trans)
 
     neo.execute_write(_do_transact, trans_list)
@@ -158,7 +159,7 @@ def create_personal_data_processors(neo, wiki):
         sensitive_data = processor["printouts"]["Behandlas känsliga personuppgifter"][0] if "Behandlas känsliga personuppgifter" in processor["printouts"] else "Undefined"
         purpose = processor["printouts"]["Ändamål"][0] if "Ändamål" in processor["printouts"] else "Undefined"
 
-        if "Tillhörande system" in processor["printouts"]:
+        if "Tillhörande system" in processor["printouts"]:      # ToDo: Check if correct test
             temp_id = [system["fulltext"].split(":", 1)[1] for system in processor["printouts"]["Tillhörande system"]]
             system_id = ",".join(temp_id)
         else:
@@ -167,11 +168,11 @@ def create_personal_data_processors(neo, wiki):
         trans = f"CREATE (s:Behandling {{name:'{processor_name}', wiki_id:{processor_id}, Ändamål:'{purpose}', Känsliga_personuppgifter:'{sensitive_data}'}})"
         trans_list.append(trans)
         trans = f"MATCH (b:Behandling), (s:System) WHERE b.wiki_id={processor_id} and s.wiki_id IN [{system_id}] \
-                  CREATE(b)-[r:Tillhör]->(s)"
+                  CREATE (b)-[r:Tillhör]->(s)"
         trans_list.append(trans)
         if sensitive_data == "Ja":
             trans = f"MATCH (b:Behandling), (k:`Känsliga personuppgifter`) WHERE b.wiki_id={processor_id} \
-                      CREATE(b)-[:innehåller]->(k)"
+                      CREATE (b)-[:innehåller]->(k)"
             trans_list.append(trans)
 
     neo.execute_write(_do_transact, trans_list)
@@ -191,7 +192,7 @@ def create_object_plans(neo, wiki):
         plan_period = plan["printouts"]["Period"][0]["raw"].split("/", 1)[1]
         plan_id = plan["fulltext"].split(":", 1)[1]
 
-        if "Tillhörande objekt" in plan["printouts"]:
+        if "Tillhörande objekt" in plan["printouts"]:      # ToDo: Check if correct test
             temp_id = [system["fulltext"].split(":", 1)[1] for system in plan["printouts"]["Tillhörande objekt"]]
             fo_id = ",".join(temp_id)
         else:
@@ -202,7 +203,7 @@ def create_object_plans(neo, wiki):
                   CREATE (fp)-[:aktuell_period]->(p)"
         trans_list.append(trans)
         trans = f"MATCH (fp:Objektplan), (fo:Objekt) WHERE fp.wiki_id={plan_id} and fo.wiki_id={fo_id}\
-                  CREATE(fp)-[r:Tillhör {{SystemUrl:'https://ufm.strangnas.se/wiki/Plan:{plan_id}', ObjektUrl:'https://itwiki.vasteras.se/wiki/Objekt:{fo_id}'}}]->(fo)"
+                  CREATE (fp)-[r:Tillhör {{SystemUrl:'https://{ITWIKI_DOMAIN}/wiki/Plan:{plan_id}', ObjektUrl:'https://{ITWIKI_DOMAIN}/wiki/Objekt:{fo_id}'}}]->(fo)"
         trans_list.append(trans)
 
     neo.execute_write(_do_transact, trans_list)
