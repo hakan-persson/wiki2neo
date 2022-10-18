@@ -20,9 +20,22 @@ DEBUG_MODE = os.getenv('DEBUG','false') == "true"                       # Global
 LOGFORMAT = "%(asctime)s %(funcName)-10s [%(levelname)s] %(message)s"   # Log format
 
 
+"""
+Decocator that times a functions running time
+"""
+import time
+def tajm(func):
+    def tajmer(*args, **kwargs):
+        start_time = time.perf_counter()
+        func(*args, **kwargs)
+        logging.info(f"Executed in {time.perf_counter()-start_time:0.2f} seconds.")
+    return tajmer
+
+
 """ 
 A callable that runs all neo transactions in a list
 """
+@tajm
 def _do_transact(tx, trans_list):
     for trans in trans_list:
         tx.run(trans)
