@@ -39,7 +39,8 @@ A callable that runs all neo transactions in a list
 def _do_transact(tx, trans_list):
     for trans in trans_list:
         tx.run(trans)
-
+    # trans = "\n".join(trans_list)+";"
+    # tx.run(trans)
 
 """ 
 Clears the Neo database
@@ -92,6 +93,19 @@ def create_systems(neo, wiki):
             trans = f"MATCH (s:System), (f:Objekt) WHERE s.wiki_id={system_id} and f.wiki_id={fo_id} \
                     CREATE (s)-[r:ingår_i]->(f)"
             trans_list.append(trans)
+
+        # trans = f"CREATE (:System {{name:'{system_name}', wiki_id:{system_id}, function:'{system_function}'}})"
+        # trans_list.append(trans)
+        # trans = f"MATCH (s:System), (f:Objekt) WHERE s.wiki_id={system_id} and f.wiki_id={fo_id} \
+        #           CREATE (s)-[:INGÅR_I]->(f)"
+        # trans_list.append(trans)
+
+
+        # trans = f"CREATE (:System {{name:'{system_name}', wiki_id:{system_id}, function:'{system_function}'}})"
+        # trans_list.append(trans)
+        # trans = f"WITH s{system_id} as s\nMATCH (f{fo_id}:Objekt) WHERE s.wiki_id={system_id} and f{fo_id}.wiki_id={fo_id} \
+        #           CREATE (s)-[:INGÅR_I]->(f{fo_id}"
+        # trans_list.append(trans)
 
     neo.execute_write(_do_transact, trans_list)
 
